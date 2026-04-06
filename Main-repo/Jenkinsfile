@@ -4,6 +4,7 @@ pipeline {
     environment {
         AWS_DEFAULT_REGION = 'us-east-1'
         TF_IN_AUTOMATION   = 'true'
+        TF_DIR             = 'Main-repo'
         SNYK_ORG           = credentials('snyk-org-slug')
     }
 
@@ -13,49 +14,57 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('Snyk IaC Scan Test') {
             steps {
-                withCredentials([string(credentialsId: 'snyk-api-token-string', variable: 'SNYK_TOKEN')]) {
-                    sh '''
-                        export PATH=$PATH:/var/lib/jenkins/tools/io.snyk.jenkins.tools.SnykInstallation/snyk
-                        snyk-linux auth $SNYK_TOKEN
-                        snyk-linux iac test --org=$SNYK_ORG --severity-threshold=high || true
-                    '''
+                dir("${TF_DIR}") {
+                    withCredentials([string(credentialsId: 'snyk-api-token-string', variable: 'SNYK_TOKEN')]) {
+                        sh '''
+                            export PATH=$PATH:/var/lib/jenkins/tools/io.snyk.jenkins.tools.SnykInstallation/snyk
+                            snyk-linux auth $SNYK_TOKEN
+                            snyk-linux iac test --org=$SNYK_ORG --severity-threshold=high || true
+                        '''
+                    }
                 }
             }
-        } 
-               
+        }
+
         stage('Snyk IaC Scan Monitor') {
             steps {
-                snykSecurity(
-                    snykInstallation: 'snyk',
-                    snykTokenId: 'snyk-api-token',
-                    additionalArguments: '--iac --report --org=$SNYK_ORG --severity-threshold=high',
-                    failOnIssues: true,
-                    monitorProjectOnBuild: false
-                )
+                dir("${TF_DIR}") {
+                    snykSecurity(
+                        snykInstallation: 'snyk',
+                        snykTokenId: 'snyk-api-token',
+                        additionalArguments: "--iac --report --org=${SNYK_ORG} --severity-threshold=high",
+                        failOnIssues: true,
+                        monitorProjectOnBuild: false
+                    )
+                }
             }
         }
-        
+
         stage('Terraform Init') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'larry'
-                ]]) {
-                    sh 'terraform init'
+                dir("${TF_DIR}") {
+                    withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'larry'
+                    ]]) {
+                        sh 'terraform init'
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'larry'
-                ]]) {
-                    sh 'terraform plan'
+                dir("${TF_DIR}") {
+                    withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'larry'
+                    ]]) {
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
@@ -76,14 +85,16 @@ pipeline {
                     )
 
                     if (destroyChoice == 'yes') {
-                        withCredentials([[
-                            $class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: 'larry'
-                        ]]) {
-                            sh 'terraform destroy -auto-approve'
+                        dir("${TF_DIR}") {
+                            withCredentials([[
+                                $class: 'AmazonWebServicesCredentialsBinding',
+                                credentialsId: 'larry'
+                            ]]) {
+                                sh 'terraform destroy -auto-approve'
+                            }
                         }
                     } else {
-                        echo "Skipping destroy"
+                        echo 'Skipping destroy'
                     }
                 }
             }
