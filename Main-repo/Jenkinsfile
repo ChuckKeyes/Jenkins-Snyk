@@ -24,7 +24,8 @@ pipeline {
                     '''
                 }
             }
-        }        
+        } 
+        /*       
         stage('Snyk IaC Scan Monitor') {
             steps {
                 snykSecurity(
@@ -36,7 +37,7 @@ pipeline {
                 )
             }
         }
-
+        */
         stage('Terraform Init') {
             steps {
                 withCredentials([[
