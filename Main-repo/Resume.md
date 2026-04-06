@@ -1,0 +1,1 @@
+“Snyk helps prevent vulnerabilities in code and infrastructure before deployment, but stopping a real-time supply chain attack requires layered security including runtime monitoring, network controls, and anomaly detection.”
