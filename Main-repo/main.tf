@@ -1,47 +1,51 @@
-resource "aws_s3_bucket" "insecure_bucket" {
-  bucket = "insecure-demo-bucket"
+resource "aws_s3_bucket" "secure_bucket" {
+  bucket = "secure-demo-bucket-123456789"
 }
 
-resource "aws_s3_bucket_public_access_block" "insecure_bucket" {
-  bucket = aws_s3_bucket.insecure_bucket.id
+resource "aws_s3_bucket_public_access_block" "secure_bucket" {
+  bucket = aws_s3_bucket.secure_bucket.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-resource "aws_security_group" "wide_open" {
-  name = "wide-open-sg"
+resource "aws_security_group" "restricted_sg" {
+  name = "restricted-sg"
 
   ingress {
-    from_port   = 0
-    to_port     = 65535
+    from_port   = 22
+    to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["YOUR-IP/32"]
   }
 }
 
-resource "aws_iam_policy" "wildcard_policy" {
-  name = "wildcard-policy"
+resource "aws_iam_policy" "limited_policy" {
+  name = "limited-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = "*"
-      Resource = "*"
+      Action   = [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        aws_s3_bucket.secure_bucket.arn,
+        "${aws_s3_bucket.secure_bucket.arn}/*"
+      ]
     }]
   })
 }
 
-resource "aws_instance" "no_imdsv2" {
-  ami           = "ami-0c55b159cbfafe1f0"
+resource "aws_instance" "imdsv2_required" {
+  ami           = "ami-xxxxxxxxxxxxxxxxx"
   instance_type = "t2.micro"
 
   metadata_options {
-    http_tokens = "optional"
+    http_tokens = "required"
   }
 }
-
-
